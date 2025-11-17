@@ -273,6 +273,215 @@ def get_object_info(ctx: Context, object_name: str) -> str:
         return f"Error getting object info: {str(e)}"
 
 @mcp.tool()
+def inspect_humanoid_rig(ctx: Context, mesh_name: str = None, armature_name: str = None, origin_hint: str = "auto") -> str:
+    """
+    Inspects the scene for a humanoid character, detects its rig structure,
+    and returns a normalized JSON description.
+    
+    Parameters:
+    - mesh_name: The name of the character mesh. If None, a likely candidate will be auto-detected.
+    - armature_name: The name of the character armature. If None, a likely candidate will be auto-detected.
+    - origin_hint: A hint about the source of the model, e.g., "meshy", "mixamo".
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_inspect_humanoid_rig", {
+            "mesh_name": mesh_name,
+            "armature_name": armature_name,
+            "origin_hint": origin_hint,
+        })
+        
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error inspecting humanoid rig: {str(e)}")
+        return f"Error inspecting humanoid rig: {str(e)}"
+
+@mcp.tool()
+def auto_rig_meshy_character(ctx: Context, mesh_name: str = None, use_auto_rig_pro: bool = True, finger_segments: int = 3) -> str:
+    """
+    Auto-rigs a mesh-only character. Uses Auto-Rig Pro if available,
+    otherwise falls back to a basic bpy implementation.
+    
+    Parameters:
+    - mesh_name: The name of the mesh to rig. If None, a likely candidate will be auto-detected.
+    - use_auto_rig_pro: Whether to prefer using Auto-Rig Pro if it's installed.
+    - finger_segments: The number of bones to create for each finger in the fallback rigger.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_auto_rig_meshy_character", {
+            "mesh_name": mesh_name,
+            "use_auto_rig_pro": use_auto_rig_pro,
+            "finger_segments": finger_segments,
+        })
+        
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error auto-rigging character: {str(e)}")
+        return f"Error auto-rigging character: {str(e)}"
+
+@mcp.tool()
+def ensure_finger_chains_for_hand(
+    ctx: Context,
+    armature_name: str = None,
+    mesh_name: str = None,
+    side: str = "L",
+    finger_segments: int = 3,
+    fingers: List[str] = None
+) -> str:
+    """
+    Ensures a given hand on a humanoid rig has a complete set of finger bones.
+    
+    Parameters:
+    - armature_name: The name of the armature. Auto-detected if None.
+    - mesh_name: The name of the mesh. Auto-detected if None.
+    - side: The side to process, either "L" or "R".
+    - finger_segments: The number of bones per finger.
+    - fingers: A list of finger names to create, e.g., ["thumb", "index", "middle", "ring", "pinky"]. Defaults to all five.
+    """
+    if fingers is None:
+        fingers = ["thumb", "index", "middle", "ring", "pinky"]
+        
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_ensure_finger_chains_for_hand", {
+            "armature_name": armature_name,
+            "mesh_name": mesh_name,
+            "side": side,
+            "finger_segments": finger_segments,
+            "fingers": fingers,
+        })
+        
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error ensuring finger chains: {str(e)}")
+        return f"Error ensuring finger chains: {str(e)}"
+
+@mcp.tool()
+def auto_weight_fingers_only(
+    ctx: Context,
+    armature_name: str = None,
+    mesh_name: str = None,
+    side: str = "both",
+    normalize: bool = True
+) -> str:
+    """
+    Applies automatic weights to finger bones only, preserving existing body weights.
+    
+    Parameters:
+    - armature_name: The name of the armature. Auto-detected if None.
+    - mesh_name: The name of the mesh. Auto-detected if None.
+    - side: The side to process, "L", "R", or "both".
+    - normalize: Whether to normalize vertex weights after the operation.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_auto_weight_fingers_only", {
+            "armature_name": armature_name,
+            "mesh_name": mesh_name,
+            "side": side,
+            "normalize": normalize,
+        })
+        
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error auto-weighting fingers: {str(e)}")
+        return f"Error auto-weighting fingers: {str(e)}"
+
+@mcp.tool()
+def arp_add_or_fix_finger_rig(
+    ctx: Context,
+    armature_name: str = None,
+    mesh_name: str = None,
+    side: str = "both"
+) -> str:
+    """
+    Uses Auto-Rig Pro to add or fix finger rigs. Falls back to a manual method if ARP is not available.
+    
+    Parameters:
+    - armature_name: The name of the armature. Auto-detected if None.
+    - mesh_name: The name of the mesh. Auto-detected if None.
+    - side: The side to process, "L", "R", or "both".
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_arp_add_or_fix_finger_rig", {
+            "armature_name": armature_name,
+            "mesh_name": mesh_name,
+            "side": side,
+        })
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error using ARP for finger rig: {str(e)}")
+        return f"Error using ARP for finger rig: {str(e)}"
+
+@mcp.tool()
+def rename_fingers_to_ue5(
+    ctx: Context,
+    armature_name: str = None,
+    side: str = "both",
+    include_body: bool = False,
+    dry_run: bool = True
+) -> str:
+    """
+    Renames bones to be compatible with Unreal Engine 5's Mannequin skeleton.
+    
+    Parameters:
+    - armature_name: The name of the armature to process. Auto-detected if None.
+    - side: The side to process, "L", "R", or "both".
+    - include_body: If True, renames major body bones as well as fingers.
+    - dry_run: If True, returns a plan of renames without executing them.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_rename_fingers_to_ue5", {
+            "armature_name": armature_name,
+            "side": side,
+            "include_body": include_body,
+            "dry_run": dry_run,
+        })
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error renaming bones to UE5 standard: {str(e)}")
+        return f"Error renaming bones to UE5 standard: {str(e)}"
+
+@mcp.tool()
+def export_ue5_ready_fbx(
+    ctx: Context,
+    filepath: str,
+    armature_name: str = None,
+    mesh_name: str = None,
+    apply_scale: float = 1.0,
+    use_tpose: bool = True,
+    export_animations: bool = False
+) -> str:
+    """
+    Exports a character as an FBX file with settings optimized for Unreal Engine 5.
+    
+    Parameters:
+    - filepath: The destination path for the exported .fbx file.
+    - armature_name: The name of the armature to export. Auto-detected if None.
+    - mesh_name: The name of the mesh to export. Auto-detected if None.
+    - apply_scale: The scale to apply to the objects before exporting.
+    - use_tpose: If True, attempts to force the rig into a T-pose before exporting.
+    - export_animations: If True, includes all actions associated with the rig.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("rigging_export_ue5_ready_fbx", {
+            "filepath": filepath,
+            "armature_name": armature_name,
+            "mesh_name": mesh_name,
+            "apply_scale": apply_scale,
+            "use_tpose": use_tpose,
+            "export_animations": export_animations,
+        })
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error exporting UE5-ready FBX: {str(e)}")
+        return f"Error exporting UE5-ready FBX: {str(e)}"
+
+@mcp.tool()
 def get_viewport_screenshot(ctx: Context, max_size: int = 800) -> Image:
     """
     Capture a screenshot of the current Blender 3D viewport.
@@ -573,7 +782,7 @@ def get_sketchfab_status(ctx: Context) -> str:
         enabled = result.get("enabled", False)
         message = result.get("message", "")
         if enabled:
-            message += "Sketchfab is good at Realistic models, and has a wider variety of models than PolyHaven."        
+            message += "Sketchfab is good at Realistic models, and has a wider variety of models than PolyHaven."		
         return message
     except Exception as e:
         logger.error(f"Error checking Sketchfab status: {str(e)}")
@@ -886,9 +1095,9 @@ def asset_creation_strategy() -> str:
         1. PolyHaven
             Use get_polyhaven_status() to verify its status
             If PolyHaven is enabled:
-            - For objects/models: Use download_polyhaven_asset() with asset_type="models"
-            - For materials/textures: Use download_polyhaven_asset() with asset_type="textures"
-            - For environment lighting: Use download_polyhaven_asset() with asset_type="hdris"
+            - For objects/models: Use download_polyhaven_asset() with asset_type=\"models\"
+            - For materials/textures: Use download_polyhaven_asset() with asset_type=\"textures\"
+            - For environment lighting: Use download_polyhaven_asset() with asset_type=\"hdris\"
         2. Sketchfab
             Sketchfab is good at Realistic models, and has a wider variety of models than PolyHaven.
             Use get_sketchfab_status() to verify its status
@@ -940,7 +1149,7 @@ def asset_creation_strategy() -> str:
     - No suitable asset exists in any of the libraries
     - Hyper3D Rodin failed to generate the desired asset
     - The task specifically requires a basic material/color
-    """
+    """)
 
 # Main execution
 
