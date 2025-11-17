@@ -331,7 +331,7 @@ def ensure_finger_chains_for_hand(
 ) -> str:
     """
     Ensures a given hand on a humanoid rig has a complete set of finger bones.
-    
+
     Parameters:
     - armature_name: The name of the armature. Auto-detected if None.
     - mesh_name: The name of the mesh. Auto-detected if None.
@@ -339,23 +339,47 @@ def ensure_finger_chains_for_hand(
     - finger_segments: The number of bones per finger.
     - fingers: A list of finger names to create, e.g., ["thumb", "index", "middle", "ring", "pinky"]. Defaults to all five.
     """
+    # Validate parameters
+    if side not in ["L", "R", "l", "r"]:
+        return json.dumps({
+            "status": "error",
+            "message": f"Invalid side '{side}'. Must be 'L' or 'R'."
+        })
+
+    if finger_segments < 1 or finger_segments > 10:
+        return json.dumps({
+            "status": "error",
+            "message": f"Invalid finger_segments {finger_segments}. Must be between 1 and 10."
+        })
+
     if fingers is None:
         fingers = ["thumb", "index", "middle", "ring", "pinky"]
-        
+    else:
+        valid_fingers = ["thumb", "index", "middle", "ring", "pinky"]
+        invalid = [f for f in fingers if f not in valid_fingers]
+        if invalid:
+            return json.dumps({
+                "status": "error",
+                "message": f"Invalid finger names: {invalid}. Valid names are: {valid_fingers}"
+            })
+
     try:
         blender = get_blender_connection()
         result = blender.send_command("rigging_ensure_finger_chains_for_hand", {
             "armature_name": armature_name,
             "mesh_name": mesh_name,
-            "side": side,
+            "side": side.upper(),  # Normalize to uppercase
             "finger_segments": finger_segments,
             "fingers": fingers,
         })
-        
+
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error ensuring finger chains: {str(e)}")
-        return f"Error ensuring finger chains: {str(e)}"
+        return json.dumps({
+            "status": "error",
+            "message": f"Error ensuring finger chains: {str(e)}"
+        })
 
 @mcp.tool()
 def auto_weight_fingers_only(
@@ -367,13 +391,20 @@ def auto_weight_fingers_only(
 ) -> str:
     """
     Applies automatic weights to finger bones only, preserving existing body weights.
-    
+
     Parameters:
     - armature_name: The name of the armature. Auto-detected if None.
     - mesh_name: The name of the mesh. Auto-detected if None.
     - side: The side to process, "L", "R", or "both".
     - normalize: Whether to normalize vertex weights after the operation.
     """
+    # Validate parameters
+    if side.lower() not in ["l", "r", "both"]:
+        return json.dumps({
+            "status": "error",
+            "message": f"Invalid side '{side}'. Must be 'L', 'R', or 'both'."
+        })
+
     try:
         blender = get_blender_connection()
         result = blender.send_command("rigging_auto_weight_fingers_only", {
@@ -382,11 +413,14 @@ def auto_weight_fingers_only(
             "side": side,
             "normalize": normalize,
         })
-        
+
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error auto-weighting fingers: {str(e)}")
-        return f"Error auto-weighting fingers: {str(e)}"
+        return json.dumps({
+            "status": "error",
+            "message": f"Error auto-weighting fingers: {str(e)}"
+        })
 
 @mcp.tool()
 def arp_add_or_fix_finger_rig(
@@ -397,12 +431,19 @@ def arp_add_or_fix_finger_rig(
 ) -> str:
     """
     Uses Auto-Rig Pro to add or fix finger rigs. Falls back to a manual method if ARP is not available.
-    
+
     Parameters:
     - armature_name: The name of the armature. Auto-detected if None.
     - mesh_name: The name of the mesh. Auto-detected if None.
     - side: The side to process, "L", "R", or "both".
     """
+    # Validate parameters
+    if side.lower() not in ["l", "r", "both"]:
+        return json.dumps({
+            "status": "error",
+            "message": f"Invalid side '{side}'. Must be 'L', 'R', or 'both'."
+        })
+
     try:
         blender = get_blender_connection()
         result = blender.send_command("rigging_arp_add_or_fix_finger_rig", {
@@ -413,7 +454,10 @@ def arp_add_or_fix_finger_rig(
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error using ARP for finger rig: {str(e)}")
-        return f"Error using ARP for finger rig: {str(e)}"
+        return json.dumps({
+            "status": "error",
+            "message": f"Error using ARP for finger rig: {str(e)}"
+        })
 
 @mcp.tool()
 def rename_fingers_to_ue5(
@@ -425,13 +469,20 @@ def rename_fingers_to_ue5(
 ) -> str:
     """
     Renames bones to be compatible with Unreal Engine 5's Mannequin skeleton.
-    
+
     Parameters:
     - armature_name: The name of the armature to process. Auto-detected if None.
     - side: The side to process, "L", "R", or "both".
     - include_body: If True, renames major body bones as well as fingers.
     - dry_run: If True, returns a plan of renames without executing them.
     """
+    # Validate parameters
+    if side.lower() not in ["l", "r", "both"]:
+        return json.dumps({
+            "status": "error",
+            "message": f"Invalid side '{side}'. Must be 'L', 'R', or 'both'."
+        })
+
     try:
         blender = get_blender_connection()
         result = blender.send_command("rigging_rename_fingers_to_ue5", {
@@ -443,7 +494,10 @@ def rename_fingers_to_ue5(
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error renaming bones to UE5 standard: {str(e)}")
-        return f"Error renaming bones to UE5 standard: {str(e)}"
+        return json.dumps({
+            "status": "error",
+            "message": f"Error renaming bones to UE5 standard: {str(e)}"
+        })
 
 @mcp.tool()
 def export_ue5_ready_fbx(

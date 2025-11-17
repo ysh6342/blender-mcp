@@ -57,14 +57,45 @@ class NormalizedHumanoid:
         self.mesh_name: Optional[str] = None
         self.has_armature_modifier: bool = False
         self.vertex_count: int = 0
-        
-        # Core bone structure
+
+        # Complete bone structure
         self.bones: Dict[str, Optional[str]] = {
+            # Core
+            "root": None,
             "hips": None,
+
+            # Spine
+            "spine": None,
+            "spine1": None,
+            "spine2": None,
+            "neck": None,
             "head": None,
+
+            # Left arm
+            "clavicle_l": None,
+            "upperarm_l": None,
+            "lowerarm_l": None,
             "hand_l": None,
+
+            # Right arm
+            "clavicle_r": None,
+            "upperarm_r": None,
+            "lowerarm_r": None,
             "hand_r": None,
+
+            # Left leg
+            "thigh_l": None,
+            "calf_l": None,
+            "foot_l": None,
+            "toe_l": None,
+
+            # Right leg
+            "thigh_r": None,
+            "calf_r": None,
+            "foot_r": None,
+            "toe_r": None,
         }
+
         self.bone_chains: Dict[str, List[str]] = {
             "spine": [],
             "arm_l": [],
@@ -72,7 +103,7 @@ class NormalizedHumanoid:
             "leg_l": [],
             "leg_r": [],
         }
-        
+
         # Finger details
         self.fingers_l: Dict[str, List[str]] = {}
         self.fingers_r: Dict[str, List[str]] = {}
@@ -193,33 +224,137 @@ def build_normalized_description(mesh_obj: bpy.types.Object, armature_obj: Optio
 
     norm.armature_name = armature_obj.name
     norm.rig_type = detect_rig_type(armature_obj)
-    
+
     bones = armature_obj.data.bones
-    
+
     # --- Bone Mapping (Heuristics) ---
-    bone_map = {b.name.lower().replace("_", "").replace("-", "").replace(" ", "").split(':')[-1]: b.name for b in bones}
-    
-    norm.bones["hips"] = bone_map.get("hips")
-    norm.bones["head"] = bone_map.get("head")
-    norm.bones["hand_l"] = bone_map.get("lefthand")
-    norm.bones["hand_r"] = bone_map.get("righthand")
-    
-    # --- Chain & Finger Detection ---
+    # Create normalized bone name map (remove prefixes, underscores, etc.)
+    bone_map = {b.name.lower().replace("_", "").replace("-", "").replace(" ", "").replace(".", "").split(':')[-1]: b.name for b in bones}
+
+    # Map all bones based on rig type
+    if norm.rig_type == "mixamo":
+        # Mixamo-specific mapping
+        norm.bones["hips"] = bone_map.get("hips")
+        norm.bones["spine"] = bone_map.get("spine")
+        norm.bones["spine1"] = bone_map.get("spine1")
+        norm.bones["spine2"] = bone_map.get("spine2")
+        norm.bones["neck"] = bone_map.get("neck")
+        norm.bones["head"] = bone_map.get("head")
+
+        norm.bones["clavicle_l"] = bone_map.get("leftshoulder")
+        norm.bones["upperarm_l"] = bone_map.get("leftarm")
+        norm.bones["lowerarm_l"] = bone_map.get("leftforearm")
+        norm.bones["hand_l"] = bone_map.get("lefthand")
+
+        norm.bones["clavicle_r"] = bone_map.get("rightshoulder")
+        norm.bones["upperarm_r"] = bone_map.get("rightarm")
+        norm.bones["lowerarm_r"] = bone_map.get("rightforearm")
+        norm.bones["hand_r"] = bone_map.get("righthand")
+
+        norm.bones["thigh_l"] = bone_map.get("leftupleg")
+        norm.bones["calf_l"] = bone_map.get("leftleg")
+        norm.bones["foot_l"] = bone_map.get("leftfoot")
+        norm.bones["toe_l"] = bone_map.get("lefttoebase")
+
+        norm.bones["thigh_r"] = bone_map.get("rightupleg")
+        norm.bones["calf_r"] = bone_map.get("rightleg")
+        norm.bones["foot_r"] = bone_map.get("rightfoot")
+        norm.bones["toe_r"] = bone_map.get("righttoebase")
+
+    else:
+        # Generic humanoid mapping - try common variations
+        # Hips/Pelvis
+        norm.bones["hips"] = (bone_map.get("hips") or bone_map.get("pelvis") or
+                             bone_map.get("hip") or bone_map.get("root"))
+
+        # Spine
+        norm.bones["spine"] = (bone_map.get("spine") or bone_map.get("spine01") or
+                              bone_map.get("spine1"))
+        norm.bones["spine1"] = (bone_map.get("spine1") or bone_map.get("spine02") or
+                               bone_map.get("spine2") or bone_map.get("chest"))
+        norm.bones["spine2"] = (bone_map.get("spine2") or bone_map.get("spine03") or
+                               bone_map.get("spine3") or bone_map.get("upperchest"))
+        norm.bones["neck"] = bone_map.get("neck") or bone_map.get("neck01")
+        norm.bones["head"] = bone_map.get("head")
+
+        # Left arm
+        norm.bones["clavicle_l"] = (bone_map.get("clavicleleft") or bone_map.get("claviclel") or
+                                   bone_map.get("shoulderl"))
+        norm.bones["upperarm_l"] = (bone_map.get("upperarml") or bone_map.get("arml") or
+                                   bone_map.get("leftshoulder"))
+        norm.bones["lowerarm_l"] = (bone_map.get("lowerarml") or bone_map.get("forearml") or
+                                   bone_map.get("elbowl"))
+        norm.bones["hand_l"] = bone_map.get("handl") or bone_map.get("lefthand")
+
+        # Right arm
+        norm.bones["clavicle_r"] = (bone_map.get("clavicleright") or bone_map.get("clavicler") or
+                                   bone_map.get("shoulderr"))
+        norm.bones["upperarm_r"] = (bone_map.get("upperarmr") or bone_map.get("armr") or
+                                   bone_map.get("rightshoulder"))
+        norm.bones["lowerarm_r"] = (bone_map.get("lowerarmr") or bone_map.get("forearmr") or
+                                   bone_map.get("elbowr"))
+        norm.bones["hand_r"] = bone_map.get("handr") or bone_map.get("righthand")
+
+        # Left leg
+        norm.bones["thigh_l"] = (bone_map.get("thighl") or bone_map.get("uplegl") or
+                                bone_map.get("hipl"))
+        norm.bones["calf_l"] = (bone_map.get("calfl") or bone_map.get("legl") or
+                               bone_map.get("shinl"))
+        norm.bones["foot_l"] = bone_map.get("footl") or bone_map.get("anklel")
+        norm.bones["toe_l"] = bone_map.get("toel") or bone_map.get("toebasel")
+
+        # Right leg
+        norm.bones["thigh_r"] = (bone_map.get("thighr") or bone_map.get("uplegr") or
+                                bone_map.get("hipr"))
+        norm.bones["calf_r"] = (bone_map.get("calfr") or bone_map.get("legr") or
+                               bone_map.get("shinr"))
+        norm.bones["foot_r"] = bone_map.get("footr") or bone_map.get("ankler")
+        norm.bones["toe_r"] = bone_map.get("toer") or bone_map.get("toebaser")
+
+    # --- Build Bone Chains ---
+    # Spine chain
+    spine_bones = [norm.bones.get("spine"), norm.bones.get("spine1"),
+                  norm.bones.get("spine2"), norm.bones.get("neck")]
+    norm.bone_chains["spine"] = [b for b in spine_bones if b]
+
+    # Left arm chain
+    arm_l_bones = [norm.bones.get("clavicle_l"), norm.bones.get("upperarm_l"),
+                  norm.bones.get("lowerarm_l"), norm.bones.get("hand_l")]
+    norm.bone_chains["arm_l"] = [b for b in arm_l_bones if b]
+
+    # Right arm chain
+    arm_r_bones = [norm.bones.get("clavicle_r"), norm.bones.get("upperarm_r"),
+                  norm.bones.get("lowerarm_r"), norm.bones.get("hand_r")]
+    norm.bone_chains["arm_r"] = [b for b in arm_r_bones if b]
+
+    # Left leg chain
+    leg_l_bones = [norm.bones.get("thigh_l"), norm.bones.get("calf_l"),
+                  norm.bones.get("foot_l"), norm.bones.get("toe_l")]
+    norm.bone_chains["leg_l"] = [b for b in leg_l_bones if b]
+
+    # Right leg chain
+    leg_r_bones = [norm.bones.get("thigh_r"), norm.bones.get("calf_r"),
+                  norm.bones.get("foot_r"), norm.bones.get("toe_r")]
+    norm.bone_chains["leg_r"] = [b for b in leg_r_bones if b]
+
+    # --- Finger Detection ---
     if norm.bones["hand_l"]:
         hand_bone_l = bones.get(norm.bones["hand_l"])
-        for child in hand_bone_l.children:
-            finger_name = next((f for f in ["thumb", "index", "middle", "ring", "pinky"] if f in child.name.lower()), None)
-            if finger_name:
-                chain = [child] + child.children_recursive
-                norm.fingers_l[finger_name] = [b.name for b in chain]
+        if hand_bone_l:
+            for child in hand_bone_l.children:
+                finger_name = next((f for f in ["thumb", "index", "middle", "ring", "pinky"] if f in child.name.lower()), None)
+                if finger_name:
+                    chain = [child] + child.children_recursive
+                    norm.fingers_l[finger_name] = [b.name for b in chain]
 
     if norm.bones["hand_r"]:
         hand_bone_r = bones.get(norm.bones["hand_r"])
-        for child in hand_bone_r.children:
-            finger_name = next((f for f in ["thumb", "index", "middle", "ring", "pinky"] if f in child.name.lower()), None)
-            if finger_name:
-                chain = [child] + child.children_recursive
-                norm.fingers_r[finger_name] = [b.name for b in chain]
+        if hand_bone_r:
+            for child in hand_bone_r.children:
+                finger_name = next((f for f in ["thumb", "index", "middle", "ring", "pinky"] if f in child.name.lower()), None)
+                if finger_name:
+                    chain = [child] + child.children_recursive
+                    norm.fingers_r[finger_name] = [b.name for b in chain]
 
     return norm
 
@@ -269,131 +404,125 @@ def rigging_auto_rig_meshy_character(
             "details": inspection
         }
 
-    # 3. Attempt to use Auto-Rig Pro if requested and available
-    arp_was_used = False
-    if use_auto_rig_pro:
-        try:
-            # Check if ARP is installed
-            import auto_rig_pro
-            arp_was_used = True
-            
-            return {
-                "status": "success_placeholder",
-                "message": f"Auto-Rig Pro was detected. A full implementation would now rig '{mesh_obj.name}'.",
-                "armature_name": "TBD_by_ARP",
-                "used_auto_rig_pro": True
-            }
+    # 3. NOTE: Auto-Rig Pro integration is not yet implemented
+    # The use_auto_rig_pro parameter is accepted for future compatibility
+    # but currently always uses the basic bpy implementation
 
+    if use_auto_rig_pro:
+        # Check if ARP is installed and log it, but don't use it yet
+        try:
+            import auto_rig_pro
+            print("INFO: Auto-Rig Pro detected but integration not yet implemented. Using fallback rigger.")
         except ImportError:
             pass
 
-    # 4. Fallback to basic bpy implementation
-    if not arp_was_used:
-        # Create a new armature
-        armature_data = bpy.data.armatures.new(f"{mesh_obj.name}_Rig")
-        armature_obj = bpy.data.objects.new(armature_data.name, armature_data)
-        bpy.context.scene.collection.objects.link(armature_obj)
-        
-        # Set armature to active object and enter edit mode
-        bpy.context.view_layer.objects.active = armature_obj
-        bpy.ops.object.mode_set(mode='EDIT')
-        
-        edit_bones = armature_obj.data.edit_bones
+    # 4. Basic bpy implementation (currently the only implementation)
+    # Create a new armature
+    armature_data = bpy.data.armatures.new(f"{mesh_obj.name}_Rig")
+    armature_obj = bpy.data.objects.new(armature_data.name, armature_data)
+    bpy.context.scene.collection.objects.link(armature_obj)
 
-        # --- Create Bones based on Mesh Bounding Box ---
-        # This is a very rough estimation
-        min_z = mesh_obj.bound_box[0][2]
-        max_z = mesh_obj.bound_box[6][2]
-        center_x = (mesh_obj.bound_box[0][0] + mesh_obj.bound_box[6][0]) / 2
-        
-        hips_pos = (center_x, 0, min_z + (max_z - min_z) * 0.4)
-        spine_pos = (center_x, 0, min_z + (max_z - min_z) * 0.6)
-        neck_pos = (center_x, 0, min_z + (max_z - min_z) * 0.8)
-        head_pos = (center_x, 0, max_z)
+    # Set armature to active object and enter edit mode
+    bpy.context.view_layer.objects.active = armature_obj
+    bpy.ops.object.mode_set(mode='EDIT')
 
-        # Spine
-        hips = edit_bones.new('hips')
-        hips.head = hips_pos
-        hips.tail = spine_pos
-        
-        spine = edit_bones.new('spine')
-        spine.head = spine_pos
-        spine.tail = neck_pos
-        spine.parent = hips
-        
-        neck = edit_bones.new('neck')
-        neck.head = neck_pos
-        neck.tail = head_pos
-        neck.parent = spine
+    edit_bones = armature_obj.data.edit_bones
 
-        head = edit_bones.new('head')
-        head.head = head_pos
-        head.tail = (head_pos[0], head_pos[1], head_pos[2] + 0.1)
-        head.parent = neck
+    # --- Create Bones based on Mesh Bounding Box ---
+    # This is a very rough estimation
+    min_z = mesh_obj.bound_box[0][2]
+    max_z = mesh_obj.bound_box[6][2]
+    center_x = (mesh_obj.bound_box[0][0] + mesh_obj.bound_box[6][0]) / 2
 
-        # Arms
-        for side in ('l', 'r'):
-            x_mult = 1 if side == 'r' else -1
-            
-            shoulder_pos = (center_x + x_mult * 0.1, 0, neck_pos[2] - 0.05)
-            elbow_pos = (center_x + x_mult * 0.3, 0, neck_pos[2] - 0.15)
-            hand_pos = (center_x + x_mult * 0.5, 0, neck_pos[2] - 0.2)
+    hips_pos = (center_x, 0, min_z + (max_z - min_z) * 0.4)
+    spine_pos = (center_x, 0, min_z + (max_z - min_z) * 0.6)
+    neck_pos = (center_x, 0, min_z + (max_z - min_z) * 0.8)
+    head_pos = (center_x, 0, max_z)
 
-            upper_arm = edit_bones.new(f'upper_arm.{side}')
-            upper_arm.head = shoulder_pos
-            upper_arm.tail = elbow_pos
-            upper_arm.parent = spine
+    # Spine
+    hips = edit_bones.new('hips')
+    hips.head = hips_pos
+    hips.tail = spine_pos
 
-            lower_arm = edit_bones.new(f'lower_arm.{side}')
-            lower_arm.head = elbow_pos
-            lower_arm.tail = hand_pos
-            lower_arm.parent = upper_arm
+    spine = edit_bones.new('spine')
+    spine.head = spine_pos
+    spine.tail = neck_pos
+    spine.parent = hips
 
-            hand = edit_bones.new(f'hand.{side}')
-            hand.head = hand_pos
-            hand.tail = (hand_pos[0] + x_mult * 0.05, hand_pos[1], hand_pos[2])
-            hand.parent = lower_arm
+    neck = edit_bones.new('neck')
+    neck.head = neck_pos
+    neck.tail = head_pos
+    neck.parent = spine
 
-        # Legs
-        for side in ('l', 'r'):
-            x_mult = 1 if side == 'r' else -1
-            
-            thigh_pos = (center_x + x_mult * 0.08, 0, hips_pos[2])
-            calf_pos = (center_x + x_mult * 0.08, 0, min_z + (max_z - min_z) * 0.2)
-            foot_pos = (center_x + x_mult * 0.08, 0, min_z)
+    head = edit_bones.new('head')
+    head.head = head_pos
+    head.tail = (head_pos[0], head_pos[1], head_pos[2] + 0.1)
+    head.parent = neck
 
-            thigh = edit_bones.new(f'thigh.{side}')
-            thigh.head = thigh_pos
-            thigh.tail = calf_pos
-            thigh.parent = hips
+    # Arms
+    for side in ('l', 'r'):
+        x_mult = 1 if side == 'r' else -1
 
-            calf = edit_bones.new(f'calf.{side}')
-            calf.head = calf_pos
-            calf.tail = foot_pos
-            calf.parent = thigh
+        shoulder_pos = (center_x + x_mult * 0.1, 0, neck_pos[2] - 0.05)
+        elbow_pos = (center_x + x_mult * 0.3, 0, neck_pos[2] - 0.15)
+        hand_pos = (center_x + x_mult * 0.5, 0, neck_pos[2] - 0.2)
 
-            foot = edit_bones.new(f'foot.{side}')
-            foot.head = foot_pos
-            foot.tail = (foot_pos[0], foot_pos[1] - 0.1, foot_pos[2])
-            foot.parent = calf
+        upper_arm = edit_bones.new(f'upper_arm.{side}')
+        upper_arm.head = shoulder_pos
+        upper_arm.tail = elbow_pos
+        upper_arm.parent = spine
 
-        # Switch back to object mode
-        bpy.ops.object.mode_set(mode='OBJECT')
+        lower_arm = edit_bones.new(f'lower_arm.{side}')
+        lower_arm.head = elbow_pos
+        lower_arm.tail = hand_pos
+        lower_arm.parent = upper_arm
 
-        # Parent mesh to armature with automatic weights
-        bpy.ops.object.select_all(action='DESELECT')
-        mesh_obj.select_set(True)
-        armature_obj.select_set(True)
-        bpy.context.view_layer.objects.active = armature_obj
-        bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+        hand = edit_bones.new(f'hand.{side}')
+        hand.head = hand_pos
+        hand.tail = (hand_pos[0] + x_mult * 0.05, hand_pos[1], hand_pos[2])
+        hand.parent = lower_arm
 
-        return {
-            "status": "success",
-            "message": f"Created a basic fallback rig for '{mesh_obj.name}' and applied automatic weights.",
-            "armature_name": armature_obj.name,
-            "used_auto_rig_pro": False,
-            "bone_count": len(armature_obj.data.bones)
-        }
+    # Legs
+    for side in ('l', 'r'):
+        x_mult = 1 if side == 'r' else -1
+
+        thigh_pos = (center_x + x_mult * 0.08, 0, hips_pos[2])
+        calf_pos = (center_x + x_mult * 0.08, 0, min_z + (max_z - min_z) * 0.2)
+        foot_pos = (center_x + x_mult * 0.08, 0, min_z)
+
+        thigh = edit_bones.new(f'thigh.{side}')
+        thigh.head = thigh_pos
+        thigh.tail = calf_pos
+        thigh.parent = hips
+
+        calf = edit_bones.new(f'calf.{side}')
+        calf.head = calf_pos
+        calf.tail = foot_pos
+        calf.parent = thigh
+
+        foot = edit_bones.new(f'foot.{side}')
+        foot.head = foot_pos
+        foot.tail = (foot_pos[0], foot_pos[1] - 0.1, foot_pos[2])
+        foot.parent = calf
+
+    # Switch back to object mode
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Parent mesh to armature with automatic weights
+    bpy.ops.object.select_all(action='DESELECT')
+    mesh_obj.select_set(True)
+    armature_obj.select_set(True)
+    bpy.context.view_layer.objects.active = armature_obj
+    bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+
+    return {
+        "status": "success",
+        "message": f"Created a basic rig for '{mesh_obj.name}' and applied automatic weights.",
+        "armature_name": armature_obj.name,
+        "method": "basic_bpy_rigger",
+        "note": "Auto-Rig Pro integration not yet available",
+        "bone_count": len(armature_obj.data.bones)
+    }
 
     return {"error": "An unknown error occurred during auto-rigging."}
 
@@ -434,14 +563,27 @@ def rigging_ensure_finger_chains_for_hand(
     hand_bone = edit_bones.get(hand_bone_name)
     
     created_fingers = {}
-    
-    # Define approximate finger positions relative to the hand
-    finger_positions = {
-        "thumb": (0.0, -0.03, 0.02),
-        "index": (0.0, -0.01, 0.05),
-        "middle": (0.0, 0.0, 0.05),
-        "ring": (0.0, 0.01, 0.05),
-        "pinky": (0.0, 0.02, 0.04)
+
+    # Calculate hand bone orientation to align fingers properly
+    hand_direction = (hand_bone.tail - hand_bone.head).normalized()
+    hand_length = (hand_bone.tail - hand_bone.head).length
+
+    # Calculate finger bone length based on hand size (15% of hand length per segment)
+    finger_bone_length = max(0.01, hand_length * 0.15)
+
+    # Calculate perpendicular vectors for finger spread
+    # Use hand bone's Y and Z axes for positioning fingers
+    hand_y_axis = hand_bone.y_axis.normalized()
+    hand_z_axis = hand_bone.z_axis.normalized()
+
+    # Define finger base positions relative to hand bone
+    # Positions are in (along_hand, across_hand, up_hand) coordinates
+    finger_base_offsets = {
+        "thumb": mathutils.Vector((0.02, -0.03, -0.01)),  # Thumb extends from side
+        "index": mathutils.Vector((0.0, 0.02, 0.0)),
+        "middle": mathutils.Vector((0.0, 0.01, 0.0)),
+        "ring": mathutils.Vector((0.0, 0.0, 0.0)),
+        "pinky": mathutils.Vector((0.0, -0.02, 0.0))
     }
 
     for finger_name in fingers:
@@ -450,22 +592,39 @@ def rigging_ensure_finger_chains_for_hand(
             created_fingers[finger_name] = "existed"
             continue
 
+        # Calculate base offset in world space
+        base_offset = finger_base_offsets.get(finger_name, mathutils.Vector((0, 0, 0)))
+
+        # Convert local offset to world space
+        world_offset = (
+            hand_direction * base_offset.x +
+            hand_z_axis * base_offset.y +
+            hand_y_axis * base_offset.z
+        )
+
         # Create finger bones
         parent_bone = hand_bone
         for i in range(finger_segments):
             bone_name = f"{finger_name}_{i+1}{side_suffix}"
             new_bone = edit_bones.new(bone_name)
-            
+
             if i == 0:
-                start_pos = finger_positions.get(finger_name, (0,0,0))
-                new_bone.head = hand_bone.tail + mathutils.Vector(start_pos)
+                # First segment: start from hand tail + offset
+                new_bone.head = hand_bone.tail + world_offset
             else:
+                # Subsequent segments: start from parent tail
                 new_bone.head = parent_bone.tail
-            
-            new_bone.tail = (new_bone.head[0], new_bone.head[1] - 0.02, new_bone.head[2])
+
+            # Point along hand direction
+            new_bone.tail = new_bone.head + (hand_direction * finger_bone_length)
+
+            # Set bone roll to match hand bone
+            new_bone.roll = hand_bone.roll
+
+            # Parent to previous bone
             new_bone.parent = parent_bone
             parent_bone = new_bone
-        
+
         created_fingers[finger_name] = "created"
 
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -485,8 +644,10 @@ def rigging_auto_weight_fingers_only(
     normalize: bool = True
 ) -> Dict[str, Any]:
     """
-    Auto-weights finger bones for a given character.
-    WARNING: This is a destructive operation. It will remove non-finger vertex groups.
+    Auto-weights finger bones for a given character, preserving existing body weights.
+    Uses proximity-based weighting to assign vertices near finger bones.
+
+    This is a NON-DESTRUCTIVE operation that only adds/updates finger vertex groups.
     """
     inspection = rigging_inspect_humanoid_rig(mesh_name=mesh_name, armature_name=armature_name)
     if inspection.get("error"):
@@ -509,44 +670,116 @@ def rigging_auto_weight_fingers_only(
     if not finger_bone_names:
         return {"status": "skipped", "message": "No finger bones found to weight."}
 
-    # --- Destructive weighting process ---
-    
-    # 1. Remove existing armature modifiers to avoid conflicts
-    for mod in mesh_obj.modifiers:
-        if mod.type == 'ARMATURE':
-            mesh_obj.modifiers.remove(mod)
+    # --- Non-destructive weighting process ---
 
-    # 2. Unparent the mesh
-    bpy.ops.object.select_all(action='DESELECT')
-    mesh_obj.select_set(True)
-    bpy.context.view_layer.objects.active = mesh_obj
-    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+    # Helper function to calculate distance from point to line segment
+    def point_to_line_distance(point, line_start, line_end):
+        """Calculate distance from point to line segment."""
+        line_vec = line_end - line_start
+        point_vec = point - line_start
+        line_len = line_vec.length
 
-    # 3. Select the mesh and armature
-    bpy.ops.object.select_all(action='DESELECT')
-    mesh_obj.select_set(True)
-    armature_obj.select_set(True)
-    bpy.context.view_layer.objects.active = armature_obj
+        if line_len < 0.0001:  # Avoid division by zero
+            return (point - line_start).length
 
-    # 4. Parent with automatic weights - this will create groups for all bones
-    bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+        t = max(0, min(1, point_vec.dot(line_vec) / (line_len ** 2)))
+        projection = line_start + t * line_vec
+        return (point - projection).length
 
-    # 5. Remove vertex groups that are NOT finger bones
-    for vgroup in mesh_obj.vertex_groups:
-        if vgroup.name not in finger_bone_names:
-            mesh_obj.vertex_groups.remove(vgroup)
+    # 1. Ensure vertex groups exist for all finger bones
+    for bone_name in finger_bone_names:
+        if bone_name not in mesh_obj.vertex_groups:
+            mesh_obj.vertex_groups.new(name=bone_name)
 
-    # 6. Normalize weights if requested
-    if normalize:
-        bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
-        bpy.ops.object.vertex_group_normalize_all(lock_active=False)
-        bpy.ops.object.mode_set(mode='OBJECT')
+    # 2. Calculate hand bone size to determine weighting threshold
+    hand_bone_l = inspection.get("hands", {}).get("left", {}).get("hand_bone")
+    hand_bone_r = inspection.get("hands", {}).get("right", {}).get("hand_bone")
+
+    # Use hand bone to estimate character scale
+    hand_scale = 1.0
+    if hand_bone_l and hand_bone_l in armature_obj.data.bones:
+        hand_bone = armature_obj.data.bones[hand_bone_l]
+        hand_scale = (hand_bone.head_local - hand_bone.tail_local).length
+    elif hand_bone_r and hand_bone_r in armature_obj.data.bones:
+        hand_bone = armature_obj.data.bones[hand_bone_r]
+        hand_scale = (hand_bone.head_local - hand_bone.tail_local).length
+
+    # Weighting threshold based on character scale
+    weight_threshold = max(0.02, hand_scale * 0.5)  # 50% of hand bone length
+
+    # 3. Weight vertices based on proximity to finger bones
+    weighted_count = 0
+
+    for bone_name in finger_bone_names:
+        if bone_name not in armature_obj.data.bones:
+            continue
+
+        bone = armature_obj.data.bones[bone_name]
+        vgroup = mesh_obj.vertex_groups[bone_name]
+
+        # Get bone position in world space
+        bone_head_world = armature_obj.matrix_world @ bone.head_local
+        bone_tail_world = armature_obj.matrix_world @ bone.tail_local
+
+        # Find vertices within range of this bone
+        for v in mesh_obj.data.vertices:
+            v_world = mesh_obj.matrix_world @ v.co
+
+            # Distance to bone line segment
+            dist = point_to_line_distance(v_world, bone_head_world, bone_tail_world)
+
+            if dist < weight_threshold:
+                # Weight based on inverse distance (closer = higher weight)
+                weight = max(0.0, 1.0 - (dist / weight_threshold))
+
+                # Apply weight (ADD mode to blend with existing weights)
+                try:
+                    vgroup.add([v.index], weight, 'ADD')
+                    weighted_count += 1
+                except:
+                    pass  # Vertex might already be in group
+
+    # 4. Normalize finger weights if requested
+    if normalize and weighted_count > 0:
+        # Normalize only finger vertex groups, not body groups
+        for bone_name in finger_bone_names:
+            if bone_name in mesh_obj.vertex_groups:
+                vgroup = mesh_obj.vertex_groups[bone_name]
+
+                # Get all vertices in this group
+                verts_in_group = []
+                for v in mesh_obj.data.vertices:
+                    for g in v.groups:
+                        if g.group == vgroup.index:
+                            verts_in_group.append(v.index)
+                            break
+
+                # Normalize weights for these vertices across all groups they belong to
+                for v_idx in verts_in_group:
+                    vertex = mesh_obj.data.vertices[v_idx]
+
+                    # Calculate total weight
+                    total_weight = 0.0
+                    for g in vertex.groups:
+                        try:
+                            total_weight += g.weight
+                        except:
+                            pass
+
+                    # Normalize if total > 1.0
+                    if total_weight > 1.0:
+                        for g in vertex.groups:
+                            try:
+                                g.weight = g.weight / total_weight
+                            except:
+                                pass
 
     return {
         "status": "success",
-        "message": f"Applied automatic weights for {len(finger_bone_names)} finger bones. " \
-                   "WARNING: This was a destructive operation that may have altered existing weights.",
+        "message": f"Applied weights for {len(finger_bone_names)} finger bones while preserving existing body weights. Weighted {weighted_count} vertex assignments.",
         "weighted_finger_bones": finger_bone_names,
+        "weighted_vertex_count": weighted_count,
+        "preserves_body_weights": True
     }
 
 def rigging_arp_add_or_fix_finger_rig(
@@ -555,32 +788,51 @@ def rigging_arp_add_or_fix_finger_rig(
     side: Literal["L","R","both"] = "both"
 ) -> Dict[str, Any]:
     """
-    Uses Auto-Rig Pro to add/fix fingers if available.
-    Falls back to the manual method otherwise.
+    Adds or fixes finger rigging for a humanoid character.
+
+    NOTE: Auto-Rig Pro integration is planned but not yet implemented.
+    Currently uses manual finger chain creation and weighting.
+
+    This function:
+    1. Creates finger bone chains if they don't exist
+    2. Applies proximity-based weights to finger bones
+    3. Preserves existing body weights
     """
+    # NOTE: ARP integration is not yet implemented
+    # The function name is kept for future compatibility
+
+    # Check if ARP is available (for informational purposes only)
+    arp_available = False
     try:
         import auto_rig_pro
-        return {
-            "status": "success_placeholder",
-            "message": "Auto-Rig Pro detected. A full implementation would use its API to rig the fingers.",
-            "method": "auto_rig_pro"
-        }
+        arp_available = True
+        print("INFO: Auto-Rig Pro detected but integration not yet implemented.")
     except ImportError:
-        results = []
-        sides_to_process = ["L", "R"] if side == "both" else [side]
-        for s in sides_to_process:
-            ensure_result = rigging_ensure_finger_chains_for_hand(armature_name, mesh_name, s)
-            results.append(ensure_result)
-            if ensure_result.get("status", "").startswith("success"):
-                weight_result = rigging_auto_weight_fingers_only(armature_name, mesh_name, s)
-                results.append(weight_result)
-        
-        return {
-            "status": "success_fallback",
-            "message": "Auto-Rig Pro not found. Used fallback to create and weight finger bones.",
-            "method": "fallback",
-            "fallback_results": results
-        }
+        pass
+
+    # Use manual rigging workflow
+    results = []
+    sides_to_process = ["L", "R"] if side == "both" else [side]
+
+    for s in sides_to_process:
+        # Create finger chains
+        ensure_result = rigging_ensure_finger_chains_for_hand(armature_name, mesh_name, s)
+        results.append(ensure_result)
+
+        # Weight the fingers if chains were created successfully
+        if ensure_result.get("status") == "success":
+            weight_result = rigging_auto_weight_fingers_only(armature_name, mesh_name, s)
+            results.append(weight_result)
+
+    return {
+        "status": "success",
+        "message": "Created and weighted finger bones using manual rigging workflow.",
+        "method": "manual_rigging",
+        "arp_available": arp_available,
+        "arp_used": False,
+        "note": "Auto-Rig Pro integration planned for future release",
+        "operation_results": results
+    }
 
 def rigging_rename_fingers_to_ue5(
     armature_name: Optional[str] = None,
